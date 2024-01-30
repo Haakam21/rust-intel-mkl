@@ -1,3 +1,5 @@
+use std::{mem::size_of, os::raw::c_void};
+
 #[allow(dead_code)]
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
@@ -5,12 +7,12 @@
 mod sys;
 
 
-pub fn malloc<T>(size: usize, align: i32) -> *mut T {
-    unsafe { sys::MKL_malloc(size, align) as *mut T }
+pub fn malloc<T>(n: usize, align: i32) -> *mut T {
+    unsafe { sys::MKL_malloc(n * size_of::<T>(), align) as *mut T }
 }
 
 pub fn free<T>(ptr: *mut T) {
-    unsafe { sys::MKL_free(ptr as *mut ::std::os::raw::c_void) };
+    unsafe { sys::MKL_free(ptr as *mut c_void) };
 }
 
 
