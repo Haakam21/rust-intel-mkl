@@ -13,6 +13,6 @@ fn main() {
         .expect("Failed to generate bindings");
 
     bindings
-        .write_to_file("src/sys.rs")
+        .write_to_file("lib/bindings.rs")
         .expect("Failed to write bindings");
 }
