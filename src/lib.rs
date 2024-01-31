@@ -1,4 +1,4 @@
-use std::{mem::size_of, os::raw::c_void};
+use std::{mem::size_of, os::raw::c_void, slice};
 
 
 #[allow(dead_code)]
@@ -95,10 +95,12 @@ pub use sys::{
 
 
 pub fn malloc<T>(n: usize, align: i32) -> *mut T {
-    unsafe { sys::MKL_malloc(n * size_of::<T>(), align) as *mut T }
+    let ptr = unsafe { sys::MKL_malloc(n * size_of::<T>(), align) } as *mut T;
+    if ptr.is_null() { panic!("MKL failed to allocate memory"); }
+    ptr
 }
 
-pub fn free<T>(ptr: *mut T) {
+pub fn free<T>(ptr: *const T) {
     unsafe { sys::MKL_free(ptr as *mut c_void) };
 }
 
@@ -134,21 +136,104 @@ pub fn vd_rng_uniform(method: i32, stream: VSLStreamStatePtr, n: i32, r: *mut f6
 }
 
 
+pub struct Buffer<T> {
+    data: *mut T,
+    len: usize,
+}
+
+impl<T> Buffer<T> {
+    pub fn new(len: usize, align: i32) -> Buffer<T> {
+        Buffer {
+            data: malloc(len, align),
+            len: len,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn as_ptr(&self) -> *const T {
+        self.data
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        unsafe { slice::from_raw_parts(self.data, self.len) }
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut T {
+        self.data
+    }
+
+    pub fn as_mut_slice(&self) -> &mut [T] {
+        unsafe { slice::from_raw_parts_mut(self.data, self.len) }
+    }
+}
+
+impl<T> Drop for Buffer<T> {
+    fn drop(&mut self) {
+        free(self.data);
+    }
+}
+
+pub struct VSLStream {
+    state: *mut c_void
+}
+
+impl VSLStream {
+    pub fn new(brng: i32, seed: u32) -> VSLStream {
+        let mut state = std::ptr::null_mut();
+        let status = vsl_new_stream(&mut state, brng, seed); // TODO
+
+        VSLStream {
+            state: state,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *const c_void {
+        self.state
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut c_void {
+        self.state
+    }
+}
+
+impl Drop for VSLStream {
+    fn drop(&mut self) {
+        vsl_delete_stream(&mut self.state);
+    }
+}
+
+
+impl Buffer<f32> {
+    pub fn rng_uniform(&self, method: i32, stream: &VSLStream, a: f32, b: f32) -> i32 {
+        vs_rng_uniform(method, stream.as_mut_ptr(), self.len().try_into().unwrap(), self.as_mut_ptr(), a, b)
+    }
+}
+
+impl Buffer<f64> {
+    pub fn rng_uniform(&self, method: i32, stream: &VSLStream, a: f64, b: f64) -> i32 {
+        vd_rng_uniform(method, stream.as_mut_ptr(), self.len().try_into().unwrap(), self.as_mut_ptr(), a, b)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_malloc() {
-        let ptr: *mut i32 = malloc(8, 64);
+        let ptr: *const i32 = malloc(8, 64);
         assert!(!ptr.is_null());
         free(ptr);
     }
 
     #[test]
     fn test_malloc_2_ptrs() {
-        let ptr1: *mut i32 = malloc(8, 64);
-        let ptr2: *mut i32 = malloc(8, 64);
+        let ptr1: *const i32 = malloc(8, 64);
+        let ptr2: *const i32 = malloc(8, 64);
 
         assert_ne!(ptr1, ptr2);
 
@@ -158,11 +243,11 @@ mod tests {
 
     #[test]
     fn test_free() {
-        let ptr1: *mut i32 = malloc(8, 64);
+        let ptr1: *const i32 = malloc(8, 64);
 
         free(ptr1);
         
-        let ptr2: *mut i32 = malloc(8, 64);
+        let ptr2: *const i32 = malloc(8, 64);
 
         assert_eq!(ptr1, ptr2);
         
@@ -188,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn test_vsl_stream() {
+    fn test_vsl_new_stream() {
         let mut stream: VSLStreamStatePtr = std::ptr::null_mut();
         let status = vsl_new_stream(&mut stream, VSL_BRNG_PHILOX4X32X10, 21);
 
@@ -204,21 +289,63 @@ mod tests {
     }
 
     #[test]
-    fn test_rng_uniform() {
-        let n = 8;
-
-        let x: *mut f64 = malloc(n, 64);
+    fn test_vd_rng_uniform() {
+        let len = 8;
+        let data: *mut f64 = malloc(len, 64);
 
         let mut stream: VSLStreamStatePtr = std::ptr::null_mut();
         vsl_new_stream(&mut stream, VSL_BRNG_PHILOX4X32X10, 21);
 
-        let status = vd_rng_uniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n.try_into().unwrap(), x, 0.0, 1.0);
+        let status = vd_rng_uniform(VSL_RNG_METHOD_UNIFORM_STD, stream, len.try_into().unwrap(), data, 0.0, 1.0);
 
         assert_eq!(status, VSL_STATUS_OK);
 
         vsl_delete_stream(&mut stream);
         free_buffers();
 
-        assert_eq!(unsafe { *x.offset(n as isize - 1) }, 0.969321598066017);
+        assert_eq!(unsafe { *data.offset(len as isize - 1) }, 0.969321598066017);
+
+        free(data);
+    }
+
+    #[test]
+    fn test_buffer() {
+        let buf: Buffer<f64> = Buffer::new(8, 64);
+
+        let mut stream: VSLStreamStatePtr = std::ptr::null_mut();
+        vsl_new_stream(&mut stream, VSL_BRNG_PHILOX4X32X10, 21);
+
+        vd_rng_uniform(VSL_RNG_METHOD_UNIFORM_STD, stream, buf.len().try_into().unwrap(), buf.as_mut_ptr(), 0.0, 1.0);
+
+        vsl_delete_stream(&mut stream);
+        free_buffers();
+
+        assert_eq!(buf.as_slice()[buf.len() - 1], 0.969321598066017);
+    }
+
+    #[test]
+    fn test_vsl_stream() {
+        let buf: Buffer<f64> = Buffer::new(8, 64);
+
+        let stream = VSLStream::new(VSL_BRNG_PHILOX4X32X10, 21);
+
+        vd_rng_uniform(VSL_RNG_METHOD_UNIFORM_STD, stream.as_mut_ptr(), buf.len().try_into().unwrap(), buf.as_mut_ptr(), 0.0, 1.0);
+
+        free_buffers();
+
+        assert_eq!(buf.as_slice()[buf.len() - 1], 0.969321598066017);
+    }
+
+    #[test]
+    fn test_buffer_rng_uniform() {
+        let buf: Buffer<f64> = Buffer::new(8, 64);
+
+        let stream = VSLStream::new(VSL_BRNG_PHILOX4X32X10, 21);
+
+        buf.rng_uniform(VSL_RNG_METHOD_UNIFORM_STD, &stream, 0.0, 1.0);
+
+        free_buffers();
+
+        assert_eq!(buf.as_slice()[buf.len() - 1], 0.969321598066017);
     }
 }
