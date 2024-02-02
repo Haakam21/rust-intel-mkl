@@ -1,11 +1,12 @@
 [package]
 name = "intel-mkl"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+num_enum = "0.7.2"
 
 [build-dependencies]
 bindgen = "0.69.2"
