@@ -55,21 +55,28 @@ impl Into<u32> for VmlMode {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum VmlModeTryFromError {
+    InvalidAccuracyMode(u32),
+    InvalidFtzdazMode(u32),
+    InvalidErrorMode(u32),
+}
+
 impl TryFrom<u32> for VmlMode {
-    type Error = String;
+    type Error = VmlModeTryFromError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         let accuracy = match VmlAccuracyMode::try_from(value & sys::VML_ACCURACY_MASK) {
             Ok(mode) => mode,
-            Err(error) => return Err(error.to_string()),
+            Err(error) => return Err(Self::Error::InvalidAccuracyMode(error.number)),
         };
         let ftzdaz = match VmlFtzdazMode::try_from(value & sys::VML_FTZDAZ_MASK) {
             Ok(mode) => mode,
-            Err(error) => return Err(error.to_string()),
+            Err(error) => return Err(Self::Error::InvalidFtzdazMode(error.number)),
         };
         let error = match VmlErrorMode::try_from(value & sys::VML_ERRMODE_MASK) {
             Ok(mode) => mode,
-            Err(error) => return Err(error.to_string()),
+            Err(error) => return Err(Self::Error::InvalidErrorMode(error.number)),
         };
 
         Ok(Self {
@@ -160,9 +167,7 @@ pub enum VslRngMethodUniformDiscrete {
 
 
 pub fn malloc<T>(n: usize, align: i32) -> *mut T {
-    let ptr = unsafe { sys::MKL_malloc(n * size_of::<T>(), align) } as *mut T;
-    if ptr.is_null() { panic!("MKL memory allocation failed"); }
-    ptr
+    unsafe { sys::MKL_malloc(n * size_of::<T>(), align) as *mut T }
 }
 
 pub fn free<T>(ptr: *const T) {
@@ -260,6 +265,7 @@ impl<T> Drop for Buffer<T> {
         free(self.data);
     }
 }
+
 
 pub struct VslStream {
     state: *mut VslStreamState
