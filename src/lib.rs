@@ -40,9 +40,9 @@ pub enum VmlErrorMode {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct VmlMode {
-    accuracy: VmlAccuracyMode,
-    ftzdaz: VmlFtzdazMode,
-    error: VmlErrorMode,
+    pub accuracy: VmlAccuracyMode,
+    pub ftzdaz: VmlFtzdazMode,
+    pub error: VmlErrorMode,
 }
 
 impl Into<u32> for VmlMode {
