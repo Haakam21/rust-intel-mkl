@@ -1,4 +1,4 @@
-use std::{ptr, slice, ffi::c_void, mem::size_of};
+use std::{ptr, slice, ffi::c_void, mem::size_of, ops::{Deref, DerefMut}};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 
@@ -266,6 +266,20 @@ impl<T> Drop for Buffer<T> {
     }
 }
 
+impl<T> Deref for Buffer<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl<T> DerefMut for Buffer<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
+}
+
 
 pub struct VslStream {
     state: *mut VslStreamState
@@ -415,7 +429,7 @@ mod tests {
         vsl_delete_stream(&mut stream).unwrap();
         free_buffers();
 
-        assert_eq!(buf.as_slice()[buf.len() - 1], 0.969321598066017);
+        assert_eq!(buf.last().unwrap().clone(), 0.969321598066017);
     }
 
     #[test]
@@ -428,7 +442,7 @@ mod tests {
 
         free_buffers();
 
-        assert_eq!(buf.as_slice()[buf.len() - 1], 0.969321598066017);
+        assert_eq!(buf.last().unwrap().clone(), 0.969321598066017);
     }
 
     #[test]
@@ -441,7 +455,7 @@ mod tests {
 
         free_buffers();
 
-        assert_eq!(buf.as_slice()[buf.len() - 1], 0.969321598066017);
+        assert_eq!(buf.last().unwrap().clone(), 0.969321598066017);
     }
 
     #[test]
@@ -455,7 +469,7 @@ mod tests {
 
         free_buffers();
 
-        assert_ne!(buf.as_slice()[buf.len() - 1], 0.969321598066017);
+        assert_ne!(buf.last().unwrap().clone(), 0.969321598066017);
     }
 
     #[test]
