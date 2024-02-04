@@ -166,8 +166,8 @@ pub enum VslRngMethodUniformDiscrete {
 }
 
 
-pub fn malloc<T>(n: usize, align: i32) -> *mut T {
-    unsafe { sys::MKL_malloc(n * size_of::<T>(), align) as *mut T }
+pub fn malloc<T>(n: usize, align: usize) -> *mut T {
+    unsafe { sys::MKL_malloc(n * size_of::<T>(), align.try_into().unwrap()) as *mut T }
 }
 
 pub fn free<T>(ptr: *const T) {
@@ -232,11 +232,15 @@ pub struct Buffer<T> {
 }
 
 impl<T> Buffer<T> {
-    pub fn new(len: usize, align: i32) -> Self {
+    pub fn new(len: usize, align: usize) -> Self {
         Self {
             data: malloc(len, align),
             len,
         }
+    }
+
+    pub fn new_align_64(len: usize) -> Self {
+        Self::new(len, 64)
     }
 
     pub fn len(&self) -> usize {
@@ -420,7 +424,7 @@ mod tests {
 
     #[test]
     fn test_buffer() {
-        let buf: Buffer<f64> = Buffer::new(8, 64);
+        let buf: Buffer<f64> = Buffer::new_align_64(8);
 
         let mut stream = vsl_new_stream(VslBrng::Philox4x32x10, 21).unwrap();
 
@@ -434,7 +438,7 @@ mod tests {
 
     #[test]
     fn test_vsl_stream() {
-        let buf: Buffer<f64> = Buffer::new(8, 64);
+        let buf: Buffer<f64> = Buffer::new_align_64(8);
 
         let stream = VslStream::new(VslBrng::Philox4x32x10, 21).unwrap();
 
@@ -447,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_buffer_rng_uniform() {
-        let buf: Buffer<f64> = Buffer::new(8, 64);
+        let buf: Buffer<f64> = Buffer::new_align_64(8);
 
         let stream = VslStream::new(VslBrng::Philox4x32x10, 21).unwrap();
 
@@ -460,7 +464,7 @@ mod tests {
 
     #[test]
     fn test_multiple_rng() {
-        let buf: Buffer<f64> = Buffer::new(8, 64);
+        let buf: Buffer<f64> = Buffer::new_align_64(8);
 
         let stream = VslStream::new(VslBrng::Philox4x32x10, 21).unwrap();
 

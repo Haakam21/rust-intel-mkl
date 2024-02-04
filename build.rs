@@ -6,6 +6,7 @@ fn main() {
     println!("cargo:rustc-link-lib=mkl_core");
     println!("cargo:rustc-link-lib=iomp5");
 
+    
     let bindings = bindgen::Builder::default()
         .header("lib/wrapper.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
