@@ -88,6 +88,20 @@ impl TryFrom<u32> for VmlMode {
 }
 
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
+#[repr(i32)]
+pub enum VmlStatus {
+    Ok = sys::VML_STATUS_OK,
+    AccuracyWarning = sys::VML_STATUS_ACCURACYWARNING,
+    AccuracyUnsupported = sys::VML_STATUS_BADSIZE,
+    NullPointer = sys::VML_STATUS_BADMEM,
+    OutOfRange = sys::VML_STATUS_ERRDOM,
+    NanValue = sys::VML_STATUS_SING,
+    Overflow = sys::VML_STATUS_OVERFLOW,
+    Underflow = sys::VML_STATUS_UNDERFLOW,
+}
+
+
 pub type VslStreamState = c_void;
 
 
